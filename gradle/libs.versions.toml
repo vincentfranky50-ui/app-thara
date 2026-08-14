@@ -8,9 +8,10 @@ lifecycleRuntimeKtx = "2.8.7"
 lifecycleViewmodelCompose = "2.8.7"
 lifecycleRuntimeCompose = "2.8.7"
 activityCompose = "1.10.1"
-kotlin = "2.2.10"
+kotlin = "2.0.20"
+composeCompiler = "1.5.14"
 composeBom = "2024.09.00"
-googleDevtoolsKsp = "2.3.5"
+googleDevtoolsKsp = "2.0.20-1.0.24"
 navigationCompose = "2.8.9"
 roomRuntime = "2.7.0"
 roomKtx = "2.7.0"
@@ -103,7 +104,7 @@ maps-compose = { group = "com.google.maps.android", name = "maps-compose", versi
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "composeCompiler" }
 google-devtools-ksp = { id = "com.google.devtools.ksp", version.ref = "googleDevtoolsKsp" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 secrets = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "secretsGradlePlugin" }
