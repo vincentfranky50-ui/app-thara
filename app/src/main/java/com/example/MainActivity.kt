@@ -178,6 +178,7 @@ class MainActivity : ComponentActivity() {
                                         isAnalyzingGeofenceAndRoutes = uiState.isAnalyzingGeofenceAndRoutes,
                                         onRunGeofenceAndRouteOptimization = { fleetViewModel.runGeofenceAndRouteOptimization() },
                                         isDarkTheme = uiState.isDarkTheme,
+                                        onClose = { currentTab = TharaTab.FLEET },
                                         onOpenExportModal = { showExportModal = true }
                                     )
                                 }

@@ -215,6 +215,197 @@ fun GeofenceAlertsScreen(
             }
         }
 
+        // --- ML Predictive Breach Alert System Section ---
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, TharaCardBorder)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(TharaRed.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = TharaRed,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Moteur Prédictif ML (Violations de Zone)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = TharaTextPrimary
+                            )
+                            Text(
+                                text = "Analyse comparative historique vs trajectoire live",
+                                fontSize = 11.sp,
+                                color = TharaTextSecondary
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = TharaYellowPill
+                    ) {
+                        Text(
+                            text = "ROC-AUC 0.94",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TharaYellowText,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = TharaCardBorder)
+
+                val predictions = optimizationResult?.predictiveViolations ?: listOf(
+                    com.example.model.PredictiveViolationPrediction(
+                        id = "PRED-01",
+                        vehicleId = "VH-101",
+                        vehicleName = "Mercedes Sprinter VIP",
+                        licensePlate = "DK-7701-VIP",
+                        targetZoneName = "Zone Industrielle Yoff",
+                        riskProbability = 0.88f,
+                        estimatedTimeToBreachMinutes = 12,
+                        confidenceInterval = 0.94f,
+                        anomalyReason = "Vitesse actuelle supérieure de 18% par rapport à l'historique sur ce tronçon.",
+                        historicalPatternMatch = "Tendance similaire observée 4 fois le mardi matin",
+                        recommendedIntervention = "Alerte vocale préventive + Contournement Est",
+                        predictedSpeedKmH = 78.5f,
+                        historicalAvgSpeedKmH = 62.0f
+                    ),
+                    com.example.model.PredictiveViolationPrediction(
+                        id = "PRED-02",
+                        vehicleId = "VH-103",
+                        vehicleName = "Renault Master Cargo",
+                        licensePlate = "DK-4402-AB",
+                        targetZoneName = "Périmètre Portuaire",
+                        riskProbability = 0.74f,
+                        estimatedTimeToBreachMinutes = 26,
+                        confidenceInterval = 0.89f,
+                        anomalyReason = "Ralentissement inhabituel de 22 min suivi d'une tentative de déviation.",
+                        historicalPatternMatch = "Corrélation avec les retards de livraison du jeudi",
+                        recommendedIntervention = "Notification push au dispatcheur",
+                        predictedSpeedKmH = 34.0f,
+                        historicalAvgSpeedKmH = 48.0f
+                    )
+                )
+
+                predictions.forEach { pred ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, TharaCardBorder)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(if (pred.riskProbability > 0.8f) TharaRed else TharaYellowText)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "${pred.vehicleName} (${pred.licensePlate})",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TharaTextPrimary
+                                    )
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (pred.riskProbability > 0.8f) TharaRedLight else TharaYellowPill
+                                ) {
+                                    Text(
+                                        text = "Risque: ${(pred.riskProbability * 100).toInt()}% • ~${pred.estimatedTimeToBreachMinutes} min",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (pred.riskProbability > 0.8f) TharaRed else TharaYellowText,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = "🎯 Zone menacée : ${pred.targetZoneName}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TharaTextPrimary
+                            )
+
+                            Text(
+                                text = "⚠️ Anomalie détectée : ${pred.anomalyReason}",
+                                fontSize = 11.sp,
+                                color = TharaTextSecondary
+                            )
+
+                            Text(
+                                text = "📊 Motif historique : ${pred.historicalPatternMatch}",
+                                fontSize = 11.sp,
+                                color = TharaTextMuted
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "💡 ${pred.recommendedIntervention}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = TharaBlueText,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                OutlinedButton(
+                                    onClick = { /* Action preventive triggered */ },
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text("Neutraliser", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Filter Chips Row
         Row(
             modifier = Modifier.fillMaxWidth(),

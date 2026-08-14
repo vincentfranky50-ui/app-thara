@@ -72,9 +72,9 @@ fun GoogleLogoIcon(modifier: Modifier = Modifier) {
             style = Stroke(width = strokeWidth)
         )
 
-        // Green bottom-right arch
+        // Dark Red bottom-right arch
         drawArc(
-            color = Color(0xFF34A853),
+            color = Color(0xFFB71C1C),
             startAngle = 0f,
             sweepAngle = 120f,
             useCenter = false,

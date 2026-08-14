@@ -37,6 +37,23 @@ data class ActionableDispatchRule(
     val impact: String
 )
 
+data class PredictiveViolationPrediction(
+    val id: String,
+    val vehicleId: String,
+    val vehicleName: String,
+    val licensePlate: String,
+    val targetZoneName: String,
+    val riskProbability: Float, // 0.0 to 1.0
+    val estimatedTimeToBreachMinutes: Int,
+    val confidenceInterval: Float, // 0.0 to 1.0
+    val anomalyReason: String,
+    val historicalPatternMatch: String,
+    val recommendedIntervention: String,
+    val predictedSpeedKmH: Float,
+    val historicalAvgSpeedKmH: Float,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 data class GeofenceAndRouteOptimizationResult(
     val analyzedAtTimestamp: Long = System.currentTimeMillis(),
     val analyzedVehiclesCount: Int,
@@ -45,6 +62,7 @@ data class GeofenceAndRouteOptimizationResult(
     val breachSummary: GeofenceBreachSummary,
     val proposals: List<RouteOptimizationProposal>,
     val actionRules: List<ActionableDispatchRule>,
+    val predictiveViolations: List<PredictiveViolationPrediction> = emptyList(),
     val overallFuelSavingsPercentage: Float,
     val monthlyEstimatedSavingsFcfa: Long,
     val rawGeminiAnalysis: String

@@ -18,6 +18,7 @@ import com.example.model.InAppCoachingNotification
 import com.example.model.MaintenancePredictionResult
 import com.example.model.MaintenanceUrgency
 import com.example.model.PredictedIssue
+import com.example.model.PredictiveViolationPrediction
 import com.example.model.RouteOptimizationProposal
 import com.example.model.Trip
 import com.example.model.Vehicle
@@ -769,6 +770,39 @@ class GeminiFleetService {
             )
         )
 
+        val predictiveViolations = listOf(
+            PredictiveViolationPrediction(
+                id = "PRED-01",
+                vehicleId = "VH-101",
+                vehicleName = "Mercedes Sprinter VIP",
+                licensePlate = "DK-7701-VIP",
+                targetZoneName = topZones.getOrNull(0) ?: "Zone Industrielle Yoff",
+                riskProbability = 0.88f,
+                estimatedTimeToBreachMinutes = 12,
+                confidenceInterval = 0.94f,
+                anomalyReason = "Vitesse actuelle supérieure de 18% par rapport à l'historique sur ce tronçon et déviation de cap vers zone restreinte.",
+                historicalPatternMatch = "Tendance similaire observée 4 fois le mardi matin aux heures de pointe",
+                recommendedIntervention = "Alerte vocale préventive conducteur + Basculement vers l'itinéraire de contournement Est",
+                predictedSpeedKmH = 78.5f,
+                historicalAvgSpeedKmH = 62.0f
+            ),
+            PredictiveViolationPrediction(
+                id = "PRED-02",
+                vehicleId = "VH-103",
+                vehicleName = "Renault Master Cargo",
+                licensePlate = "DK-4402-AB",
+                targetZoneName = topZones.getOrNull(1) ?: "Périmètre Portuaire",
+                riskProbability = 0.74f,
+                estimatedTimeToBreachMinutes = 26,
+                confidenceInterval = 0.89f,
+                anomalyReason = "Ralentissement inhabituel de 22 minutes sur la N1 suivi d'une tentative de contournement non autorisé.",
+                historicalPatternMatch = "Corrélation forte avec les retards de livraison du jeudi après-midi",
+                recommendedIntervention = "Notification push au dispatcheur pour validation d'un nouveau corridor de livraison",
+                predictedSpeedKmH = 34.0f,
+                historicalAvgSpeedKmH = 48.0f
+            )
+        )
+
         val totalFuelSaved = proposals.sumOf { it.estimatedFuelSavedLiters }
         val totalOrigFuel = representativeTrips.take(4).sumOf { it.fuelConsumedLiters }.coerceAtLeast(1.0)
         val overallSavingsPct = ((totalFuelSaved / totalOrigFuel) * 100).toFloat().coerceIn(12f, 28f)
@@ -791,6 +825,7 @@ class GeminiFleetService {
             ),
             proposals = proposals,
             actionRules = actionRules,
+            predictiveViolations = predictiveViolations,
             overallFuelSavingsPercentage = overallSavingsPct,
             monthlyEstimatedSavingsFcfa = monthlySavingsFcfa,
             rawGeminiAnalysis = execSummary

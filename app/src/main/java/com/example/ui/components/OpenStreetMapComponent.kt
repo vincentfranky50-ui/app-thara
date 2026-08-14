@@ -92,40 +92,36 @@ val OpenTopoSource = XYTileSource(
 )
 
 val SatelliteSource = object : OnlineTileSourceBase(
-    "Google_Satellite_Hybrid",
-    0, 20, 256, "",
+    "Esri_World_Imagery",
+    0, 19, 256, "",
     arrayOf(
-        "https://mt0.google.com/vt/lyrs=y&x=",
-        "https://mt1.google.com/vt/lyrs=y&x=",
-        "https://mt2.google.com/vt/lyrs=y&x=",
-        "https://mt3.google.com/vt/lyrs=y&x="
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"
     ),
-    "© Google Satellite"
+    "© Esri World Imagery"
 ) {
     override fun getTileURLString(pMapTileIndex: Long): String {
         val zoom = MapTileIndex.getZoom(pMapTileIndex)
         val x = MapTileIndex.getX(pMapTileIndex)
         val y = MapTileIndex.getY(pMapTileIndex)
-        return baseUrl + x + "&y=" + y + "&z=" + zoom
+        return baseUrl + zoom + "/" + y + "/" + x
     }
 }
 
-val TrafficOverlaySource = object : OnlineTileSourceBase(
-    "Google_Traffic",
-    0, 20, 256, "",
+val CartoVoyagerSource = object : OnlineTileSourceBase(
+    "Carto_Voyager",
+    0, 20, 256, ".png",
     arrayOf(
-        "https://mt0.google.com/vt/lyrs=m,traffic&x=",
-        "https://mt1.google.com/vt/lyrs=m,traffic&x=",
-        "https://mt2.google.com/vt/lyrs=m,traffic&x=",
-        "https://mt3.google.com/vt/lyrs=m,traffic&x="
+        "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
+        "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
+        "https://c.basemaps.cartocdn.com/rastertiles/voyager/"
     ),
-    "© Google Traffic"
+    "© OpenStreetMap contributors, CARTO"
 ) {
     override fun getTileURLString(pMapTileIndex: Long): String {
         val zoom = MapTileIndex.getZoom(pMapTileIndex)
         val x = MapTileIndex.getX(pMapTileIndex)
         val y = MapTileIndex.getY(pMapTileIndex)
-        return baseUrl + x + "&y=" + y + "&z=" + zoom
+        return baseUrl + zoom + "/" + x + "/" + y + ".png"
     }
 }
 
@@ -158,7 +154,7 @@ fun OpenStreetMapView(
     val isOnline = MapTileCacheManager.isNetworkAvailable(context)
 
     val tileSource = if (isTrafficEnabled) {
-        TrafficOverlaySource
+        CartoVoyagerSource
     } else {
         when (activeSourceType) {
             "Cycle" -> CyclOSMSource
@@ -701,58 +697,56 @@ fun SatelliteHybridWebViewMap(
 
                                     var map = L.map('map', { zoomControl: false, maxZoom: 20 }).setView([$centerLat, $centerLng], 15);
                                     
-                                    // 1. Google Satellite Hybrid (Primary - HD photos + road/place labels)
-                                    var googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-                                        maxZoom: 20,
-                                        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                                        attribution: 'Google Maps Satellite Hybride'
-                                    });
-
-                                    // 2. Google Maps Standard Roadmap (Plan Vectoriel Officiel Google Maps)
-                                    var googleRoadmap = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                                        maxZoom: 20,
-                                        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                                        attribution: 'Google Maps Plan Vectoriel'
-                                    });
-
-                                    // 3. Google Maps Terrain / Relief
-                                    var googleTerrain = L.tileLayer('https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
-                                        maxZoom: 20,
-                                        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                                        attribution: 'Google Maps Relief / Terrain'
-                                    });
-
-                                    // 4. Google Pure Satellite
-                                    var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-                                        maxZoom: 20,
-                                        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                                        attribution: 'Google Satellite Pur'
-                                    });
-
-                                    // 5. Esri World Imagery (Satellite Fallback)
+                                    // 1. Esri World Imagery (Free Satellite HD)
                                     var esriSat = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                                         maxZoom: 19,
-                                        attribution: 'Esri Satellite'
+                                        attribution: '© Esri World Imagery'
+                                    });
+
+                                    // 2. CartoDB Voyager (Free OSM Standard Vector Style)
+                                    var cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                                        maxZoom: 20,
+                                        subdomains: ['a', 'b', 'c', 'd'],
+                                        attribution: '© OpenStreetMap contributors, CARTO'
+                                    });
+
+                                    // 3. OpenStreetMap Standard
+                                    var osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                        maxZoom: 19,
+                                        attribution: '© OpenStreetMap contributors'
+                                    });
+
+                                    // 4. CartoDB Dark (Night Mode)
+                                    var cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                                        maxZoom: 20,
+                                        subdomains: ['a', 'b', 'c', 'd'],
+                                        attribution: '© CARTO Dark'
+                                    });
+
+                                    // 5. OpenTopoMap (Relief / Terrain)
+                                    var openTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                                        maxZoom: 17,
+                                        attribution: '© OpenTopoMap, CC-BY-SA'
                                     });
 
                                     // Set Active Layer based on Mode
-                                    var defaultLayer = ${if (isSatelliteMode) "googleHybrid" else "googleRoadmap"};
+                                    var defaultLayer = ${if (isSatelliteMode) "esriSat" else "cartoVoyager"};
                                     defaultLayer.addTo(map);
 
                                     // Tile error automatic fallback
                                     defaultLayer.on('tileerror', function() {
-                                        if (!map.hasLayer(googleRoadmap) && !map.hasLayer(esriSat)) {
-                                            googleRoadmap.addTo(map);
+                                        if (!map.hasLayer(cartoVoyager) && !map.hasLayer(osmStandard)) {
+                                            cartoVoyager.addTo(map);
                                         }
                                     });
 
                                     // Layer switcher control in top right
                                     var baseMaps = {
-                                        "🛰️ Google Satellite Hybride": googleHybrid,
-                                        "🗺️ Google Maps Plan Vectoriel": googleRoadmap,
-                                        "⛰️ Google Maps Relief / Terrain": googleTerrain,
-                                        "📷 Google Satellite Pur": googleSat,
-                                        "🌍 Esri Satellite": esriSat
+                                        "🛰️ Esri Satellite": esriSat,
+                                        "🗺️ Carto Voyager": cartoVoyager,
+                                        "🌍 OpenStreetMap": osmStandard,
+                                        "🌙 Carto Dark": cartoDark,
+                                        "⛰️ OpenTopo Relief": openTopo
                                     };
                                     L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
@@ -839,7 +833,7 @@ fun SatelliteHybridWebViewMap(
                         </html>
                     """.trimIndent()
 
-                    loadDataWithBaseURL("https://maps.google.com", htmlContent, "text/html", "UTF-8", null)
+                    loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
                 }
             },
             update = { webView ->

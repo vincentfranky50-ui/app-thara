@@ -611,7 +611,7 @@ fun ReportsScreen(
                         text = "↗ +2.1%",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF059669) // Emerald green
+                        color = TharaRed // Dark red
                     )
                 }
             }

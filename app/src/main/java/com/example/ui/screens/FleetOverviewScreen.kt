@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,10 +47,14 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Satellite
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Card
@@ -134,6 +142,7 @@ fun FleetOverviewScreen(
     var useOsmdroidMap by remember { mutableStateOf(false) }
     var showOfflineCacheSheet by remember { mutableStateOf(false) }
     var isBluetoothConnected by remember { mutableStateOf(true) }
+    var isBottomPanelExpanded by remember { mutableStateOf(true) }
     var showVehicleDirectorySheet by remember { mutableStateOf(false) }
     var showMessageCenter by remember { mutableStateOf(false) }
     var showControlModal by remember { mutableStateOf(false) }
@@ -343,7 +352,7 @@ fun FleetOverviewScreen(
             VehicleRealTimeStatusOverlay(vehicle = activeVehicle)
         }
 
-        // 5. BOTTOM FLOATING SHEET ("Rav4(NDJESSA)")
+        // 5. BOTTOM FLOATING SHEET ("Rav4(NDJESSA)") - COLLAPSIBLE / EXPANDABLE
         Card(
             colors = CardDefaults.cardColors(containerColor = Color.Transparent),
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
@@ -351,36 +360,52 @@ fun FleetOverviewScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                )
                 .testTag("vehicle_floating_sheet")
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0xAA0F172A), // Dark slate glassmorphism (66% opacity)
+                        color = Color(0xAA0F172A), // Dark slate glassmorphism
                         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                     )
+                    .clickable { isBottomPanelExpanded = !isBottomPanelExpanded }
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Drag Handle
-                Box(
-                    modifier = Modifier
-                        .width(40.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(Color(0x66FFFFFF))
-                )
+                // Drag Handle / Toggle Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(40.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color(0x66FFFFFF))
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Title Row: Vehicle Icon + Name + Google Logo Watermark
+                // Title Row: Vehicle Icon + Name + Collapse/Expand Arrow + Google Watermark
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { isBottomPanelExpanded = !isBottomPanelExpanded }
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
@@ -398,196 +423,97 @@ fun FleetOverviewScreen(
 
                         Spacer(modifier = Modifier.width(10.dp))
 
-                        Text(
-                            text = activeVehicle.name,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                        Column {
+                            Text(
+                                text = activeVehicle.name,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = if (isBottomPanelExpanded) "Appuyer pour baisser / réduire" else "Souléver pour voir tous les dispositifs",
+                                fontSize = 11.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Icon(
+                            imageVector = if (isBottomPanelExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                            contentDescription = null,
+                            tint = Color(0xFF38BDF8),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
-                    // Google Watermark Text
-                    Text(
-                        text = "Google",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0x99FFFFFF)
-                    )
+                    // Google Watermark Text & Dispositifs button
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Button(
+                            onClick = { showVehicleDirectorySheet = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Text(text = "Dispositifs", fontSize = 11.sp, color = Color.White)
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = "Google",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0x99FFFFFF)
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                if (isBottomPanelExpanded) {
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                // 2x4 GRID OF CIRCULAR ACTION BUTTONS
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    // 1. Position (Blue)
-                    GridActionButton(
-                        title = "Position",
-                        icon = Icons.Default.LocationOn,
-                        backgroundColor = Color(0xFF1E88E5),
-                        onClick = {
-                            Toast.makeText(
-                                context,
-                                "Position GPS : ${activeVehicle.latitude}° N, ${activeVehicle.longitude}° E (${activeVehicle.address})",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    )
+                    // STREAMLINED ACTION BAR (Position, Contrôle, Géorepérage, Trajectoire)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround
+                    ) {
+                        GridActionButton(
+                            title = "Position",
+                            icon = Icons.Default.LocationOn,
+                            backgroundColor = Color(0xFF1E88E5),
+                            onClick = {
+                                Toast.makeText(
+                                    context,
+                                    "Position GPS : ${activeVehicle.latitude}° N, ${activeVehicle.longitude}° E (${activeVehicle.address})",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        )
 
-                    // 2. Contrôle (Red/Coral)
-                    GridActionButton(
-                        title = "Contrôle",
-                        icon = Icons.Default.Tune,
-                        backgroundColor = Color(0xFFEF5350),
-                        onClick = { showControlModal = true }
-                    )
+                        GridActionButton(
+                            title = "Contrôle",
+                            icon = Icons.Default.Tune,
+                            backgroundColor = Color(0xFFEF5350),
+                            onClick = { showControlModal = true }
+                        )
 
-                    // 3. Armer (Cyan/Sky Blue)
-                    GridActionButton(
-                        title = if (isArmed) "Armer" else "Désarmer",
-                        icon = if (isArmed) Icons.Default.Lock else Icons.Default.LockOpen,
-                        backgroundColor = Color(0xFF03A9F4),
-                        onClick = {
-                            isArmed = !isArmed
-                            Toast.makeText(
-                                context,
-                                if (isArmed) "Système Antivol Armé 🔒" else "Système Antivol Désarmé 🔓",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    )
-
-                    // 4. Géorepérage (Orange/Gold)
-                    Box {
                         GridActionButton(
                             title = "Géorepérage",
                             icon = Icons.Default.GridOn,
                             backgroundColor = Color(0xFFFFA726),
-                            onClick = {
-                                showGeofencePopupMenu = true
-                            }
+                            onClick = { onOpenGeofenceConfig?.invoke() }
                         )
 
-                        DropdownMenu(
-                            expanded = showGeofencePopupMenu,
-                            onDismissRequest = { showGeofencePopupMenu = false },
-                            modifier = Modifier.background(Color.White)
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Définir le mouvement", color = Color(0xFF1E293B)) },
-                                onClick = {
-                                    showGeofencePopupMenu = false
-                                    Toast.makeText(context, "Définir le mouvement activé", Toast.LENGTH_SHORT).show()
-                                },
-                                leadingIcon = {
-                                    Icon(imageVector = Icons.Default.RadioButtonChecked, contentDescription = null, tint = Color(0xFF10B981))
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Annuler le mouvement", color = Color(0xFF1E293B)) },
-                                onClick = {
-                                    showGeofencePopupMenu = false
-                                    Toast.makeText(context, "Mouvement annulé", Toast.LENGTH_SHORT).show()
-                                },
-                                leadingIcon = {
-                                    Icon(imageVector = Icons.Default.RadioButtonChecked, contentDescription = null, tint = Color(0xFF64748B))
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Géoréperage", color = Color(0xFF1E293B)) },
-                                onClick = {
-                                    showGeofencePopupMenu = false
-                                    onOpenGeofenceConfig?.invoke()
-                                },
-                                leadingIcon = {
-                                    Icon(imageVector = Icons.Default.GridOn, contentDescription = null, tint = Color(0xFFFFA726))
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    // 5. Paramètres (Teal)
-                    GridActionButton(
-                        title = "Paramètres",
-                        icon = Icons.Default.Settings,
-                        backgroundColor = Color(0xFF26A69A),
-                        onClick = { showSettingsModal = true }
-                    )
-
-                    // 6. Trajectoire (Bright Blue)
-                    GridActionButton(
-                        title = "Trajectoire",
-                        icon = Icons.Default.AltRoute,
-                        backgroundColor = Color(0xFF2979FF),
-                        onClick = { onNavigateToTrips?.invoke() }
-                    )
-
-                    // 7. Détails de l'a... (Coral/Orange)
-                    GridActionButton(
-                        title = "Détails de l'a...",
-                        icon = Icons.Default.Article,
-                        backgroundColor = Color(0xFFFF7043),
-                        onClick = { showTelemetryDetailsSheet = true }
-                    )
-
-                    // 8. Plus (Slate / Grey-Blue)
-                    Box {
                         GridActionButton(
-                            title = "Plus",
-                            icon = Icons.Default.MoreHoriz,
-                            backgroundColor = Color(0xFF546E7A),
-                            onClick = { showExtraPlusSheet = true }
+                            title = "Trajectoire",
+                            icon = Icons.Default.AltRoute,
+                            backgroundColor = Color(0xFF2979FF),
+                            onClick = { onNavigateToTrips?.invoke() }
                         )
-
-                        DropdownMenu(
-                            expanded = showExtraPlusSheet,
-                            onDismissRequest = { showExtraPlusSheet = false },
-                            modifier = Modifier.background(Color.White)
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Rapport", color = Color(0xFF1E293B)) },
-                                onClick = {
-                                    showExtraPlusSheet = false
-                                    showStatisticalReports = true
-                                },
-                                leadingIcon = {
-                                    Icon(imageVector = Icons.Default.Assessment, contentDescription = null, tint = Color(0xFFFFA726))
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Enregistrement des instructions", color = Color(0xFF1E293B)) },
-                                onClick = {
-                                    showExtraPlusSheet = false
-                                    showControlInstructions = true
-                                },
-                                leadingIcon = {
-                                    Icon(imageVector = Icons.Default.Assignment, contentDescription = null, tint = Color(0xFF10B981))
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Dissocier l'appareil", color = Color(0xFF1E293B)) },
-                                onClick = {
-                                    showExtraPlusSheet = false
-                                    Toast.makeText(context, "Appareil dissocié", Toast.LENGTH_SHORT).show()
-                                },
-                                leadingIcon = {
-                                    Icon(imageVector = Icons.Default.LinkOff, contentDescription = null, tint = Color(0xFF8B5CF6))
-                                }
-                            )
-                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
@@ -715,6 +641,14 @@ fun FleetOverviewScreen(
                         color = Color.Gray
                     )
                     vehicles.forEach { v ->
+                        val (dotColor, statusLabel) = when (v.status) {
+                            VehicleStatus.MOVING -> Pair(Color(0xFF22C55E), "En mouvement")
+                            VehicleStatus.IDLE -> Pair(Color(0xFFF59E0B), "Ralenti")
+                            VehicleStatus.STOPPED -> Pair(Color(0xFF64748B), "À l'arrêt")
+                            VehicleStatus.OFFLINE -> Pair(Color(0xFF94A3B8), "Hors ligne")
+                            VehicleStatus.ALERT_GEOFENCE -> Pair(Color(0xFFEF4444), "Alerte Zone")
+                        }
+
                         Card(
                             colors = CardDefaults.cardColors(containerColor = if (v.id == activeVehicle.id) Color(0xFFE3F2FD) else Color(0xFFF5F5F5)),
                             shape = RoundedCornerShape(12.dp),
@@ -723,6 +657,7 @@ fun FleetOverviewScreen(
                                 .clickable {
                                     onSelectVehicle?.invoke(v)
                                     showVehicleDirectorySheet = false
+                                    showTelemetryDetailsSheet = true
                                 }
                         ) {
                             Row(
@@ -732,7 +667,10 @@ fun FleetOverviewScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
                                     Icon(
                                         imageVector = Icons.Default.DirectionsCar,
                                         contentDescription = null,
@@ -740,11 +678,24 @@ fun FleetOverviewScreen(
                                         modifier = Modifier.size(24.dp)
                                     )
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(text = v.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                        Text(text = "${v.licensePlate} • ${v.speedKmH.toInt()} km/h", fontSize = 12.sp, color = Color.Gray)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = v.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(text = "${v.licensePlate} • ${v.speedKmH.toInt()} km/h", fontSize = 12.sp, color = Color.Gray)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .clip(CircleShape)
+                                                    .background(dotColor)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(text = statusLabel, fontSize = 11.sp, color = dotColor, fontWeight = FontWeight.SemiBold)
+                                        }
                                     }
                                 }
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Icon(
                                     imageVector = Icons.Default.ChevronRight,
                                     contentDescription = null,

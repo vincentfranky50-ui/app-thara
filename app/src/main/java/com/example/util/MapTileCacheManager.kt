@@ -133,8 +133,6 @@ object MapTileCacheManager {
 
     fun handleUrlRequest(context: Context, url: String): WebResourceResponse? {
         val isMapResource = url.contains("arcgisonline.com") ||
-                url.contains("google.com/vt") ||
-                url.contains("google.com") ||
                 url.contains("openstreetmap.org") ||
                 url.contains("leaflet") ||
                 url.contains("tile") ||

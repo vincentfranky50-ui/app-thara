@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -163,6 +164,22 @@ fun TripHistoryScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (onClose != null) {
+                            IconButton(
+                                onClick = onClose,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("trip_history_back_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Retour",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
@@ -204,37 +221,7 @@ fun TripHistoryScreen(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Gemini AI Optimizer Action Button
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    androidx.compose.ui.graphics.Brush.linearGradient(
-                                        listOf(Cyan500, TharaRed)
-                                    )
-                                )
-                                .clickable {
-                                    showOptimizationSheet = true
-                                    if (optimizationResult == null) {
-                                        onRunGeofenceAndRouteOptimization?.invoke()
-                                    }
-                                }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                                .testTag("trips_gemini_optimize_button")
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Assistant IA Géofence", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
 
-                        Spacer(modifier = Modifier.width(8.dp))
 
                         if (onOpenExportModal != null) {
                             Box(

@@ -92,7 +92,7 @@ private fun generateTripMapHtml(trip: Trip, isDarkTheme: Boolean): String {
     val tileUrl = if (isDarkTheme) {
         "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
     } else {
-        "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
     }
 
     val labelTileUrl = "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"

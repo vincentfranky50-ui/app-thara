@@ -13,8 +13,8 @@ val TharaBluePill = Color(0xFFE3F2FD)
 val TharaBlueText = Color(0xFF1976D2)
 val TharaYellowPill = Color(0xFFFFF8E1)
 val TharaYellowText = Color(0xFFD97706)
-val TharaGreenPill = Color(0xFFE8F5E9)
-val TharaGreenText = Color(0xFF2E7D32)
+val TharaGreenPill = Color(0xFFFFEBEE)
+val TharaGreenText = Color(0xFFB71C1C)
 val TharaGrayPill = Color(0xFFF3F4F6)
 val TharaGrayText = Color(0xFF4B5563)
 
@@ -46,11 +46,11 @@ val Cyan400 = Color(0xFF22D3EE)
 val Cyan300 = Color(0xFF67E8F9)
 val Cyan900 = Color(0xFF164E63)
 
-// Success - Emerald
-val Emerald600 = Color(0xFF059669)
-val Emerald500 = Color(0xFF10B981)
-val Emerald400 = Color(0xFF34D399)
-val Emerald950 = Color(0xFF022C22)
+// Dark Red replacement for Emerald / Green
+val Emerald600 = Color(0xFF991B1B)
+val Emerald500 = Color(0xFFB91C1C)
+val Emerald400 = Color(0xFFDC2626)
+val Emerald950 = Color(0xFF450A0A)
 
 // Warning - Amber
 val Amber600 = Color(0xFFD97706)

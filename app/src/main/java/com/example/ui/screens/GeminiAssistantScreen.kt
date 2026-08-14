@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.Cyan400
 import com.example.ui.theme.Cyan500
 import com.example.ui.theme.Indigo400
+import com.example.ui.theme.TharaRed
 
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -79,8 +80,9 @@ fun GeminiAssistantScreen(
         // AI Banner Header
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(Color(0xFF334155)))
         ) {
             Row(
                 modifier = Modifier.padding(16.dp),
@@ -90,7 +92,7 @@ fun GeminiAssistantScreen(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Cyan500),
+                        .background(TharaRed),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -101,19 +103,19 @@ fun GeminiAssistantScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
                 Column {
                     Text(
                         text = "Thara AI Diagnostic",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color.White
                     )
                     Text(
                         text = "Intelligence Artificielle de gestion télématique de flotte",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color(0xFF94A3B8)
                     )
                 }
             }
@@ -127,11 +129,11 @@ fun GeminiAssistantScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("open_engine_maintenance_card")
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .clickable { onOpenEngineMaintenance() },
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
-                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(Cyan400))
+                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(Color(0xFF334155)))
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -146,13 +148,13 @@ fun GeminiAssistantScreen(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Cyan500),
+                                .background(TharaRed.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.DirectionsCar,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = TharaRed,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -171,10 +173,10 @@ fun GeminiAssistantScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
-                                        .background(Cyan400)
+                                        .background(TharaRed)
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
-                                    Text("NOUVEAU", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                                    Text("NOUVEAU", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
                                 }
                             }
                             Text(
@@ -188,7 +190,7 @@ fun GeminiAssistantScreen(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Cyan500)
+                            .background(TharaRed)
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
                         Text("Ouvrir ➔", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
