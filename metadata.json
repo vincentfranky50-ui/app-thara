@@ -1,0 +1,6 @@
+{
+  "name": "Thara Tracking",
+  "description": "Suivi de flotte par géolocalisation, géofencing et assistant IA Gemini",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
