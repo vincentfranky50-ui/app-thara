@@ -86,6 +86,7 @@ fun ReportsScreen(
     onOpenDriverCoaching: (() -> Unit)? = null,
     onOpenRouteOptimization: (() -> Unit)? = null,
     onOpenExportModal: (() -> Unit)? = null,
+    onOpenAiChat: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -241,6 +242,84 @@ fun ReportsScreen(
                 }
             }
         }
+        // AI Copilot Conversational Chat Banner
+        if (onOpenAiChat != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("reports_ai_copilot_chat_banner")
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable { onOpenAiChat() },
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B4B)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF818CF8))
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(TharaRed),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Thara AI Copilot (Chat Direct)",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(TharaRed)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("NOUVEAU", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                                }
+                            }
+                            Text(
+                                text = "Interrogez l'état de la flotte en direct (ralenti, carburant, vitesse)",
+                                fontSize = 11.sp,
+                                color = Color(0xFFC7D2FE)
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(TharaRed)
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text("Discuter ➔", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         // AI Engine Maintenance Highlight Card
         if (onOpenEngineMaintenance != null) {
             Card(

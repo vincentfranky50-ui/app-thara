@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CropFree
@@ -88,6 +89,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.GeofenceZone
 import com.example.model.Vehicle
+import com.example.model.FirestoreFleetVehicle
+import com.example.ui.components.FirestoreFleetVehicleList
 import com.example.model.VehicleStatus
 import com.example.ui.components.OfflineMapTileCacheSheet
 import com.example.ui.components.OpenStreetMapView
@@ -102,16 +105,21 @@ import kotlinx.coroutines.launch
 fun FleetOverviewScreen(
     vehicles: List<Vehicle> = emptyList(),
     geofences: List<GeofenceZone> = emptyList(),
+    alerts: List<com.example.model.Alert> = emptyList(),
     selectedVehicle: Vehicle? = null,
     onSelectVehicle: ((Vehicle) -> Unit)? = null,
     onNavigateToMap: () -> Unit,
     onNavigateToVehicleDetail: (String) -> Unit,
     onNavigateToTrips: (() -> Unit)? = null,
     onOpenGeofenceConfig: (() -> Unit)? = null,
+    onOpenAiAssistant: (() -> Unit)? = null,
+    onAcknowledgeAlert: ((String) -> Unit)? = null,
+    onClearAllAlerts: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val unreadAlertsCount = remember(alerts) { alerts.count { !it.acknowledged } }
 
     // Default vehicle: Rav4(NDJESSA) or selected vehicle
     val activeVehicle = selectedVehicle ?: vehicles.firstOrNull() ?: Vehicle(
@@ -216,7 +224,7 @@ fun FleetOverviewScreen(
                 }
             )
 
-            // Bell / Notification Button with Badge "99"
+            // Bell / Notification Button with dynamic unread Badge (0 = no badge)
             Box {
                 FloatingCircleButton(
                     icon = Icons.Default.Notifications,
@@ -225,20 +233,22 @@ fun FleetOverviewScreen(
                         showMessageCenter = true
                     }
                 )
-                // Red Badge "99"
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .clip(CircleShape)
-                        .background(Color(0xFFD32F2F))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "99",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                // Red Badge only shown if notifications > 0 (zero by default)
+                if (unreadAlertsCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .clip(CircleShape)
+                            .background(Color(0xFFD32F2F))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (unreadAlertsCount > 99) "99+" else unreadAlertsCount.toString(),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -251,6 +261,17 @@ fun FleetOverviewScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // AI Copilot Circle Button (Red / AutoAwesome)
+            FloatingCircleButton(
+                icon = Icons.Default.AutoAwesome,
+                contentDescription = "Thara AI Copilot",
+                containerColor = TharaRed,
+                iconColor = Color.White,
+                onClick = {
+                    onOpenAiAssistant?.invoke()
+                }
+            )
+
             // Profile Circle Button (Blue)
             FloatingCircleButton(
                 icon = Icons.Default.Person,
@@ -518,194 +539,73 @@ fun FleetOverviewScreen(
         }
     }
 
-    // MODAL 1: VEHICLE DIRECTORY / SELECTOR SHEET (BAANOOL IOT HIERARCHY)
+    // MODAL 1: VEHICLE DIRECTORY / SELECTOR SHEET (FIRESTORE REAL-TIME VEHICLE LIST)
     if (showVehicleDirectorySheet) {
         ModalBottomSheet(
             onDismissRequest = { showVehicleDirectorySheet = false },
             sheetState = bottomSheetState
         ) {
-            var searchQuery by remember { mutableStateOf("") }
-            var selectedTab by remember { mutableStateOf(0) } // 0: Total, 1: En ligne, 2: Hors ligne
-
-            val groups = listOf(
-                Pair("admin", 0),
-                Pair("CUSTOMER", 16),
-                Pair("ARMEL MFOSSI", 7),
-                Pair("prince fashion", 0),
-                Pair("willy car", 5)
-            )
+            val firestoreFleetVehicles = remember(vehicles) {
+                vehicles.map { v ->
+                    FirestoreFleetVehicle(
+                        id = v.id,
+                        name = v.name,
+                        licensePlate = v.licensePlate,
+                        imei = v.imei,
+                        driverName = v.driverName,
+                        driverPhone = v.driverPhone,
+                        speedKmH = v.speedKmH,
+                        fuelLevelPct = v.fuelLevelPct,
+                        batteryPct = v.batteryPct,
+                        latitude = v.latitude,
+                        longitude = v.longitude,
+                        heading = v.heading,
+                        enterpriseId = v.enterpriseId,
+                        enterpriseName = v.enterpriseName,
+                        lastUpdateTimestamp = v.lastUpdateTimestamp,
+                        address = v.address,
+                        ignitionOn = v.ignitionOn,
+                        geofenceZoneId = v.geofenceZoneId,
+                        odometryKm = v.odometryKm,
+                        engineTempC = v.engineTempC,
+                        lockState = v.lockState,
+                        statusRaw = v.status.name
+                    )
+                }
+            }
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .height(600.dp)
+                    .padding(top = 8.dp)
             ) {
-                // Search Bar
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Numéro de l'appareil / numéro...", fontSize = 14.sp, color = Color.Gray) },
-                    leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(24.dp),
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF10B981),
-                        unfocusedBorderColor = Color(0xFFE2E8F0)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                FirestoreFleetVehicleList(
+                    vehicles = firestoreFleetVehicles,
+                    isLiveFirestoreSync = true,
+                    onVehicleClick = { fv ->
+                        val matchedVehicle = vehicles.find { it.id == fv.id }
+                        if (matchedVehicle != null) {
+                            onSelectVehicle?.invoke(matchedVehicle)
+                        }
+                        showVehicleDirectorySheet = false
+                        showTelemetryDetailsSheet = true
+                    },
+                    onLocateOnMap = { fv ->
+                        val matchedVehicle = vehicles.find { it.id == fv.id }
+                        if (matchedVehicle != null) {
+                            onSelectVehicle?.invoke(matchedVehicle)
+                        }
+                        showVehicleDirectorySheet = false
+                    },
+                    onOpenDiagnostics = { fv ->
+                        onNavigateToVehicleDetail(fv.id)
+                        showVehicleDirectorySheet = false
+                    },
+                    onRefresh = {
+                        Toast.makeText(context, "Actualisation Firestore réussie", Toast.LENGTH_SHORT).show()
+                    }
                 )
-
-                // Tabs Row: Total (31) | En ligne (15) | Hors ligne (...)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val tabs = listOf("Total (31)", "En ligne (15)", "Hors ligne (... )")
-                    tabs.forEachIndexed { index, tabTitle ->
-                        val isSelected = selectedTab == index
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .clickable { selectedTab = index }
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = tabTitle,
-                                fontSize = 14.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color(0xFF10B981) else Color.Gray
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Box(
-                                modifier = Modifier
-                                    .width(60.dp)
-                                    .height(2.dp)
-                                    .background(if (isSelected) Color(0xFF10B981) else Color.Transparent)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Hierarchy Groups List
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    groups.forEach { (groupName, count) ->
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
-                            shape = RoundedCornerShape(12.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    Toast.makeText(context, "Groupe $groupName sélectionné ($count véhicules)", Toast.LENGTH_SHORT).show()
-                                    showVehicleDirectorySheet = false
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "$groupName ($count)",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF1E293B)
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = "Ouvrir",
-                                    tint = Color(0xFF64748B),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Also list vehicles if search query matches or user wants direct vehicle access
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Véhicules Directs",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Gray
-                    )
-                    vehicles.forEach { v ->
-                        val (dotColor, statusLabel) = when (v.status) {
-                            VehicleStatus.MOVING -> Pair(Color(0xFF22C55E), "En mouvement")
-                            VehicleStatus.IDLE -> Pair(Color(0xFFF59E0B), "Ralenti")
-                            VehicleStatus.STOPPED -> Pair(Color(0xFF64748B), "À l'arrêt")
-                            VehicleStatus.OFFLINE -> Pair(Color(0xFF94A3B8), "Hors ligne")
-                            VehicleStatus.ALERT_GEOFENCE -> Pair(Color(0xFFEF4444), "Alerte Zone")
-                        }
-
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = if (v.id == activeVehicle.id) Color(0xFFE3F2FD) else Color(0xFFF5F5F5)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onSelectVehicle?.invoke(v)
-                                    showVehicleDirectorySheet = false
-                                    showTelemetryDetailsSheet = true
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.DirectionsCar,
-                                        contentDescription = null,
-                                        tint = Color(0xFF10B981),
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = v.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(text = "${v.licensePlate} • ${v.speedKmH.toInt()} km/h", fontSize = 12.sp, color = Color.Gray)
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(8.dp)
-                                                    .clip(CircleShape)
-                                                    .background(dotColor)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(text = statusLabel, fontSize = 11.sp, color = dotColor, fontWeight = FontWeight.SemiBold)
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = null,
-                                    tint = Color.Gray,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -713,6 +613,9 @@ fun FleetOverviewScreen(
     // MODAL: MESSAGE CENTER (NOTIFICATION BELL)
     if (showMessageCenter) {
         com.example.ui.components.MessageCenterBottomSheet(
+            alerts = alerts,
+            onAcknowledgeAlert = onAcknowledgeAlert,
+            onClearAllAlerts = onClearAllAlerts,
             onDismiss = { showMessageCenter = false }
         )
     }

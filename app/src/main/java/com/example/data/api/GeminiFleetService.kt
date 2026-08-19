@@ -22,6 +22,7 @@ import com.example.model.PredictiveViolationPrediction
 import com.example.model.RouteOptimizationProposal
 import com.example.model.Trip
 import com.example.model.Vehicle
+import com.example.model.VehicleStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -830,6 +831,306 @@ class GeminiFleetService {
             monthlyEstimatedSavingsFcfa = monthlySavingsFcfa,
             rawGeminiAnalysis = execSummary
         )
+    }
+
+    suspend fun chatWithFleetAssistant(
+        history: List<com.example.model.AiChatMessage>,
+        vehicles: List<Vehicle>,
+        userPrompt: String
+    ): Pair<String, List<com.example.model.VehicleSummaryCard>> = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            return@withContext generateHeuristicChatResponse(vehicles, userPrompt)
+        }
+
+        val fleetContext = buildString {
+            appendLine("=== ÉTAT ACTUEL DE LA FLOTTE EN TEMPS RÉEL (THARA TRACKING) ===")
+            vehicles.forEach { v ->
+                appendLine("• [ID: ${v.id}] ${v.name} (Plaque: ${v.licensePlate})")
+                appendLine("   - Statut: ${v.status.labelFr} (Contact/Moteur: ${if (v.ignitionOn) "ALLUMÉ" else "ÉTEINT"})")
+                appendLine("   - Vitesse: ${v.speedKmH.toInt()} km/h | Niveau Carburant: ${v.fuelLevelPct}% | Batterie GPS: ${v.batteryPct}%")
+                appendLine("   - Chauffeur: ${v.driverName} (Tél: ${v.driverPhone})")
+                appendLine("   - Odomètre: ${v.odometryKm.toInt()} km | Température Moteur: ${v.engineTempC}°C")
+                appendLine("   - Emplacement: ${v.address} (${v.latitude}, ${v.longitude})")
+            }
+        }
+
+        val systemInstruction = """
+            Tu es 'Thara AI Copilot', l'assistant conversationnel intelligent pour les gestionnaires de flotte de 'Thara Tracking'.
+            Tu as un accès direct et en temps réel aux télémétries GPS de tous les véhicules de la flotte.
+            
+            Voici les données télématiques actuelles de la flotte :
+            $fleetContext
+            
+            DIRECTIVES DE RÉPONSE :
+            1. Réponds de façon concise, précise, claire et professionnelle en français (ou dans la langue de la question).
+            2. Si l'utilisateur demande "Quels camions/véhicules sont au ralenti (idling) ?", identifie précisément les véhicules dont le moteur tourne (contact allumé) mais dont la vitesse est nulle ou statut Ralenti/IDLE, avec leur chauffeur et durée/adresse.
+            3. Si l'utilisateur demande "Y a-t-il des véhicules en réserve de carburant (low on fuel) ?", liste tous les véhicules ayant un niveau de carburant inférieur à 25% (ou le plus bas), avec le pourcentage exact restant.
+            4. Si l'utilisateur demande qui est en excès de vitesse, cite les véhicules dépassant 80 km/h.
+            5. Utilise des puces et des mises en gras pour rendre le texte agréable et instantanément lisible pour un gestionnaire de flotte.
+            6. Quand tu mentionnes un véhicule, indique clairement son nom et sa plaque pour faciliter l'identification.
+        """.trimIndent()
+
+        val contentsArray = JSONArray()
+
+        // Add previous conversation turns (up to 6 last messages for context)
+        val recentHistory = history.takeLast(6)
+        for (msg in recentHistory) {
+            val role = if (msg.sender == com.example.model.MessageSender.USER) "user" else "model"
+            contentsArray.put(JSONObject().apply {
+                put("role", role)
+                put("parts", JSONArray().apply {
+                    put(JSONObject().apply { put("text", msg.text) })
+                })
+            })
+        }
+
+        // Add current user prompt with injected fleet context
+        val currentUserPart = if (contentsArray.length() == 0) {
+            "$systemInstruction\n\nQuestion de l'utilisateur : $userPrompt"
+        } else {
+            "Données temps réel actuelles de la flotte :\n$fleetContext\n\nQuestion : $userPrompt"
+        }
+
+        contentsArray.put(JSONObject().apply {
+            put("role", "user")
+            put("parts", JSONArray().apply {
+                put(JSONObject().apply { put("text", currentUserPart) })
+            })
+        })
+
+        val jsonBody = JSONObject().apply {
+            put("contents", contentsArray)
+        }
+
+        val mediaType = "application/json; charset=utf-8".toMediaType()
+        val requestBody = jsonBody.toString().toRequestBody(mediaType)
+
+        val request = Request.Builder()
+            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey")
+            .post(requestBody)
+            .build()
+
+        try {
+            val response = client.newCall(request).execute()
+            val responseString = response.body?.string() ?: ""
+            if (response.isSuccessful) {
+                val jsonRes = JSONObject(responseString)
+                val candidates = jsonRes.optJSONArray("candidates")
+                if (candidates != null && candidates.length() > 0) {
+                    val cand = candidates.getJSONObject(0)
+                    val content = cand.optJSONObject("content")
+                    val parts = content?.optJSONArray("parts")
+                    if (parts != null && parts.length() > 0) {
+                        val aiText = parts.getJSONObject(0).optString("text", "")
+                        val matchingCards = findReferencedVehicles(vehicles, aiText, userPrompt)
+                        return@withContext Pair(aiText, matchingCards)
+                    }
+                }
+            }
+            generateHeuristicChatResponse(vehicles, userPrompt)
+        } catch (e: Exception) {
+            generateHeuristicChatResponse(vehicles, userPrompt)
+        }
+    }
+
+    private fun findReferencedVehicles(
+        vehicles: List<Vehicle>,
+        aiText: String,
+        userPrompt: String
+    ): List<com.example.model.VehicleSummaryCard> {
+        val lowerText = (aiText + " " + userPrompt).lowercase()
+        return vehicles.filter { v ->
+            lowerText.contains(v.name.lowercase()) ||
+                    lowerText.contains(v.licensePlate.lowercase()) ||
+                    lowerText.contains(v.id.lowercase()) ||
+                    lowerText.contains(v.driverName.lowercase())
+        }.take(4).map { v ->
+            com.example.model.VehicleSummaryCard(
+                vehicleId = v.id,
+                name = v.name,
+                licensePlate = v.licensePlate,
+                status = v.status,
+                speedKmH = v.speedKmH,
+                fuelLevelPct = v.fuelLevelPct,
+                driverName = v.driverName,
+                locationDescription = v.address
+            )
+        }
+    }
+
+    private fun generateHeuristicChatResponse(
+        vehicles: List<Vehicle>,
+        userPrompt: String
+    ): Pair<String, List<com.example.model.VehicleSummaryCard>> {
+        val prompt = userPrompt.lowercase()
+
+        // 1. Idling query
+        if (prompt.contains("idle") || prompt.contains("idling") || prompt.contains("ralenti") || prompt.contains("tourne") || prompt.contains("contact")) {
+            val idlingVehicles = vehicles.filter { 
+                it.status == VehicleStatus.IDLE || (it.ignitionOn && it.speedKmH < 2f && it.status != VehicleStatus.STOPPED && it.status != VehicleStatus.OFFLINE)
+            }
+
+            val cards = idlingVehicles.map { v ->
+                com.example.model.VehicleSummaryCard(
+                    vehicleId = v.id,
+                    name = v.name,
+                    licensePlate = v.licensePlate,
+                    status = v.status,
+                    speedKmH = v.speedKmH,
+                    fuelLevelPct = v.fuelLevelPct,
+                    driverName = v.driverName,
+                    locationDescription = v.address
+                )
+            }
+
+            val response = if (idlingVehicles.isNotEmpty()) {
+                buildString {
+                    appendLine("🚚 **Véhicules actuellement au ralenti (Idling) :**")
+                    appendLine("Nous avons détecté **${idlingVehicles.size} véhicule(s)** avec moteur allumé à l'arrêt :")
+                    appendLine()
+                    idlingVehicles.forEach { v ->
+                        appendLine("• **${v.name}** (${v.licensePlate})")
+                        appendLine("  - Chauffeur : ${v.driverName}")
+                        appendLine("  - Carburant : ${v.fuelLevelPct}% | Temp. Moteur : ${v.engineTempC}°C")
+                        appendLine("  - Emplacement : ${v.address}")
+                        appendLine()
+                    }
+                    appendLine("💡 *Conseil Thara AI : Un ralenti prolongé de plus de 5 minutes consomme environ 1.2L/heure inutilement.*")
+                }
+            } else {
+                "✅ **Aucun véhicule n'est actuellement au ralenti prolongé.** Tous les véhicules actifs sont soit en mouvement régulier, soit contact coupé à l'arrêt."
+            }
+            return Pair(response, cards)
+        }
+
+        // 2. Fuel status query
+        if (prompt.contains("fuel") || prompt.contains("carburant") || prompt.contains("essence") || prompt.contains("diesel") || prompt.contains("réserve") || prompt.contains("bas") || prompt.contains("running low")) {
+            val lowFuelVehicles = vehicles.filter { it.fuelLevelPct <= 30 }.sortedBy { it.fuelLevelPct }
+            val cards = (if (lowFuelVehicles.isNotEmpty()) lowFuelVehicles else vehicles.sortedBy { it.fuelLevelPct }.take(2)).map { v ->
+                com.example.model.VehicleSummaryCard(
+                    vehicleId = v.id,
+                    name = v.name,
+                    licensePlate = v.licensePlate,
+                    status = v.status,
+                    speedKmH = v.speedKmH,
+                    fuelLevelPct = v.fuelLevelPct,
+                    driverName = v.driverName,
+                    locationDescription = v.address
+                )
+            }
+
+            val response = if (lowFuelVehicles.isNotEmpty()) {
+                buildString {
+                    appendLine("⛽ **Alerte Réserve Carburant :**")
+                    appendLine("Il y a **${lowFuelVehicles.size} véhicule(s)** avec un niveau de carburant critique (≤ 30%) :")
+                    appendLine()
+                    lowFuelVehicles.forEach { v ->
+                        val urgency = if (v.fuelLevelPct <= 15) "🔴 CRITIQUE" else "🟠 ATTENTION"
+                        appendLine("• **${v.name}** (${v.licensePlate}) — $urgency")
+                        appendLine("  - Niveau actuel : **${v.fuelLevelPct}% restant**")
+                        appendLine("  - Chauffeur : ${v.driverName} (${v.driverPhone})")
+                        appendLine("  - Position : ${v.address}")
+                        appendLine()
+                    }
+                    appendLine("💡 *Action recommandée : Envoyer une notification au chauffeur pour un ravitaillement à la station la plus proche.*")
+                }
+            } else {
+                val lowest = vehicles.minByOrNull { it.fuelLevelPct }
+                "✅ **Tous les véhicules disposent d'un niveau de carburant suffisant (> 30%).**\nLe niveau le plus bas actuel est sur **${lowest?.name ?: "VH-101"}** (${lowest?.fuelLevelPct ?: 65}%)."
+            }
+            return Pair(response, cards)
+        }
+
+        // 3. Speeding / Speed query
+        if (prompt.contains("vitesse") || prompt.contains("speed") || prompt.contains("excès") || prompt.contains("rapide")) {
+            val speeding = vehicles.filter { it.speedKmH > 75 }.sortedByDescending { it.speedKmH }
+            val cards = speeding.map { v ->
+                com.example.model.VehicleSummaryCard(
+                    vehicleId = v.id,
+                    name = v.name,
+                    licensePlate = v.licensePlate,
+                    status = v.status,
+                    speedKmH = v.speedKmH,
+                    fuelLevelPct = v.fuelLevelPct,
+                    driverName = v.driverName,
+                    locationDescription = v.address
+                )
+            }
+
+            val response = if (speeding.isNotEmpty()) {
+                buildString {
+                    appendLine("⚡ **Véhicules à Vitesse Élevée (> 75 km/h) :**")
+                    speeding.forEach { v ->
+                        appendLine("• **${v.name}** (${v.licensePlate}) : **${v.speedKmH.toInt()} km/h**")
+                        appendLine("  - Chauffeur : ${v.driverName}")
+                        appendLine("  - Emplacement : ${v.address}")
+                        appendLine()
+                    }
+                }
+            } else {
+                "✅ **Aucun excès de vitesse détecté.** Tous les véhicules roulent à des allures conformes aux limites de leurs zones respectives."
+            }
+            return Pair(response, cards)
+        }
+
+        // 4. Offline / Stopped query
+        if (prompt.contains("offline") || prompt.contains("hors ligne") || prompt.contains("arrêt") || prompt.contains("stoppé")) {
+            val stopped = vehicles.filter { it.status == VehicleStatus.STOPPED || it.status == VehicleStatus.OFFLINE }
+            val cards = stopped.take(3).map { v ->
+                com.example.model.VehicleSummaryCard(
+                    vehicleId = v.id,
+                    name = v.name,
+                    licensePlate = v.licensePlate,
+                    status = v.status,
+                    speedKmH = v.speedKmH,
+                    fuelLevelPct = v.fuelLevelPct,
+                    driverName = v.driverName,
+                    locationDescription = v.address
+                )
+            }
+
+            val response = buildString {
+                appendLine("📍 **Véhicules à l'arrêt ou hors-ligne :**")
+                appendLine("Total détecté : **${stopped.size} véhicule(s)**")
+                stopped.forEach { v ->
+                    val badge = if (v.status == VehicleStatus.OFFLINE) "⚫ Hors-Ligne" else "⚪ En Arrêt"
+                    appendLine("• **${v.name}** (${v.licensePlate}) [$badge] - ${v.address}")
+                }
+            }
+            return Pair(response, cards)
+        }
+
+        // 5. Default General Summary
+        val movingCount = vehicles.count { it.status == VehicleStatus.MOVING }
+        val idleCount = vehicles.count { it.status == VehicleStatus.IDLE }
+        val avgFuel = if (vehicles.isNotEmpty()) vehicles.map { it.fuelLevelPct }.average().toInt() else 75
+        val cards = vehicles.take(2).map { v ->
+            com.example.model.VehicleSummaryCard(
+                vehicleId = v.id,
+                name = v.name,
+                licensePlate = v.licensePlate,
+                status = v.status,
+                speedKmH = v.speedKmH,
+                fuelLevelPct = v.fuelLevelPct,
+                driverName = v.driverName,
+                locationDescription = v.address
+            )
+        }
+
+        val response = buildString {
+            appendLine("📊 **Synthèse Globale de la Flotte Thara :**")
+            appendLine("• **Total Véhicules Suivis :** ${vehicles.size}")
+            appendLine("• **En Mouvement :** $movingCount véhicule(s)")
+            appendLine("• **Au Ralenti (Idling) :** $idleCount véhicule(s)")
+            appendLine("• **Niveau Moyen de Carburant :** $avgFuel%")
+            appendLine()
+            appendLine("💡 *Vous pouvez me demander :*")
+            appendLine("▸ *'Quels camions sont au ralenti ?'*")
+            appendLine("▸ *'Y a-t-il des véhicules en réserve de carburant ?'*")
+            appendLine("▸ *'Qui est en excès de vitesse ?'*")
+        }
+        return Pair(response, cards)
     }
 }
 

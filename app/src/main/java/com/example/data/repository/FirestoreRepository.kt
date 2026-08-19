@@ -87,6 +87,65 @@ class FirestoreRepository {
     }
 
     /**
+     * Exposes a Flow emitting typed FirestoreFleetVehicle models directly from Firestore.
+     */
+    fun observeFirestoreFleetVehicles(): Flow<List<com.example.model.FirestoreFleetVehicle>> = callbackFlow {
+        val db = firestoreInstance
+        if (db == null) {
+            close()
+            return@callbackFlow
+        }
+
+        val listener = db.collection("vehicles")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("FirestoreRepository", "Error observing Firestore vehicles: ", error)
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null) {
+                    val fleetVehicles = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val data = doc.data ?: return@mapNotNull null
+                            com.example.model.FirestoreFleetVehicle(
+                                id = doc.id,
+                                name = data["name"] as? String ?: "Véhicule ${doc.id}",
+                                licensePlate = data["licensePlate"] as? String ?: "DK-0000",
+                                imei = data["imei"] as? String ?: "000000000000000",
+                                driverName = data["driverName"] as? String ?: "Non assigné",
+                                driverPhone = data["driverPhone"] as? String ?: "+221 00 000 00 00",
+                                speedKmH = (data["speedKmH"] as? Number)?.toFloat() ?: 0f,
+                                batteryPct = (data["batteryPct"] as? Number)?.toInt() ?: 100,
+                                fuelLevelPct = (data["fuelLevelPct"] as? Number)?.toInt() ?: 100,
+                                latitude = (data["latitude"] as? Number)?.toDouble() ?: 14.7167,
+                                longitude = (data["longitude"] as? Number)?.toDouble() ?: -17.4677,
+                                heading = (data["heading"] as? Number)?.toFloat() ?: 0f,
+                                enterpriseId = data["enterpriseId"] as? String ?: "ENT-01",
+                                enterpriseName = data["enterpriseName"] as? String ?: "Flotte Thara",
+                                lastUpdateTimestamp = (data["lastUpdateTimestamp"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                                address = data["address"] as? String ?: "Dakar, Sénégal",
+                                ignitionOn = data["ignitionOn"] as? Boolean ?: false,
+                                geofenceZoneId = data["geofenceZoneId"] as? String,
+                                odometryKm = (data["odometryKm"] as? Number)?.toDouble() ?: 12450.0,
+                                engineTempC = (data["engineTempC"] as? Number)?.toInt() ?: 88,
+                                lockState = data["lockState"] as? Boolean ?: true,
+                                statusRaw = data["status"] as? String ?: "STOPPED"
+                            )
+                        } catch (e: Exception) {
+                            Log.e("FirestoreRepository", "Parsing FirestoreFleetVehicle error: ${doc.id}", e)
+                            null
+                        }
+                    }
+                    trySend(fleetVehicles)
+                }
+            }
+
+        awaitClose {
+            listener.remove()
+        }
+    }
+
+    /**
      * Updates real-time location metrics for a single vehicle.
      */
     suspend fun updateVehicleLocation(

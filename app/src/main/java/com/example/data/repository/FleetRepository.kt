@@ -220,32 +220,8 @@ class FleetRepository(
 
         fleetDao.insertGeofences(initialGeofences.map { GeofenceEntity.fromModel(it) })
 
-        val initialAlerts = listOf(
-            Alert(
-                id = "ALT-881",
-                vehicleId = "VH-105",
-                vehicleName = "Mercedes Sprinter - VIP Shuttle",
-                licensePlate = "DK-7701-VIP",
-                type = AlertType.SPEEDING,
-                severity = AlertSeverity.WARNING,
-                message = "Excès de vitesse détecté : 105 km/h sur zone limitée à 90 km/h (Autoroute A1)",
-                timestamp = System.currentTimeMillis() - 180000,
-                acknowledged = false
-            ),
-            Alert(
-                id = "ALT-882",
-                vehicleId = "VH-103",
-                vehicleName = "Volvo FH16 Truck",
-                licensePlate = "SN-4512-B",
-                type = AlertType.GEOFENCE_ENTRY,
-                severity = AlertSeverity.INFO,
-                message = "Entrée dans la Zone Portuaire de Dakar",
-                timestamp = System.currentTimeMillis() - 900000,
-                acknowledged = true
-            )
-        )
-
-        fleetDao.insertAlerts(initialAlerts.map { AlertEntity.fromModel(it) })
+        // Initialisation propre : Zéro alerte de test par défaut
+        fleetDao.deleteAllAlerts()
     }
 
     private suspend fun startRealtimeSimulationLoop() {
@@ -508,6 +484,14 @@ class FleetRepository(
 
     suspend fun acknowledgeAlert(alertId: String) {
         fleetDao.acknowledgeAlert(alertId)
+    }
+
+    suspend fun clearAllAlerts() {
+        fleetDao.deleteAllAlerts()
+    }
+
+    suspend fun acknowledgeAllAlerts() {
+        fleetDao.acknowledgeAllAlerts()
     }
 
     // --- Geofence Geometry Utilities ---

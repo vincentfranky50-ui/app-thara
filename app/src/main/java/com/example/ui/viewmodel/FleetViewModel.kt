@@ -65,13 +65,31 @@ data class FleetUiState(
     val isAnalyzingBehavior: Boolean = false,
     val geofenceRouteOptimization: GeofenceAndRouteOptimizationResult? = null,
     val isAnalyzingGeofenceAndRoutes: Boolean = false,
-    val userSettings: UserSettings = UserSettings()
+    val userSettings: UserSettings = UserSettings(),
+    val chatMessages: List<com.example.model.AiChatMessage> = emptyList(),
+    val isAiChatLoading: Boolean = false
 )
 
 class FleetViewModel(application: Application) : AndroidViewModel(application) {
     private val database = TharaDatabase.getDatabase(application)
     private val repository = FleetRepository(database.fleetDao(), viewModelScope, application)
     private val geminiService = GeminiFleetService()
+
+    private val _chatMessages = MutableStateFlow<List<com.example.model.AiChatMessage>>(
+        listOf(
+            com.example.model.AiChatMessage(
+                sender = com.example.model.MessageSender.ASSISTANT,
+                text = "👋 Bonjour ! Je suis **Thara AI Copilot**, votre assistant télématique propulsé par Gemini 3.5 Flash.\n\nPosez-moi des questions en langage naturel sur votre flotte, par exemple :\n• *\"Quels camions sont au ralenti (idling) ?\"*\n• *\"Y a-t-il des véhicules en réserve de carburant ?\"*\n• *\"Qui dépasse les limites de vitesse actuellement ?\"*",
+                suggestedActions = listOf(
+                    "Quels camions sont au ralenti ?",
+                    "Y a-t-il des véhicules en réserve de carburant ?",
+                    "Qui est en excès de vitesse ?",
+                    "Bilan général de la flotte"
+                )
+            )
+        )
+    )
+    private val _isAiChatLoading = MutableStateFlow(false)
 
     private val _searchQuery = MutableStateFlow("")
     private val _statusFilter = MutableStateFlow<VehicleStatus?>(null)
@@ -159,7 +177,9 @@ class FleetViewModel(application: Application) : AndroidViewModel(application) {
             _isAnalyzingBehavior,
             _geofenceRouteOptimization,
             _isAnalyzingGeofenceAndRoutes,
-            _userSettings
+            _userSettings,
+            _chatMessages,
+            _isAiChatLoading
         ) { args -> args }
     ) { group1, group2, group3 ->
         val vehicles = group1[0] as List<Vehicle>
@@ -190,6 +210,8 @@ class FleetViewModel(application: Application) : AndroidViewModel(application) {
         val geofenceOpt = group3[3] as GeofenceAndRouteOptimizationResult?
         val analyzingGeofenceRoutes = group3[4] as Boolean
         val settings = group3[5] as UserSettings
+        val chatMsgs = group3[6] as List<com.example.model.AiChatMessage>
+        val chatLoading = group3[7] as Boolean
 
         val filtered = vehicles.filter { v ->
             val matchesQuery = query.isBlank() ||
@@ -244,7 +266,9 @@ class FleetViewModel(application: Application) : AndroidViewModel(application) {
             isAnalyzingBehavior = analyzingBehavior,
             geofenceRouteOptimization = geofenceOpt,
             isAnalyzingGeofenceAndRoutes = analyzingGeofenceRoutes,
-            userSettings = settings
+            userSettings = settings,
+            chatMessages = chatMsgs,
+            isAiChatLoading = chatLoading
         )
     }.stateIn(
         scope = viewModelScope,
@@ -311,6 +335,12 @@ class FleetViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun clearAllAlerts() {
+        viewModelScope.launch {
+            repository.clearAllAlerts()
+        }
+    }
+
     fun setAddVehicleDialogOpen(open: Boolean) {
         _isAddVehicleDialogOpen.value = open
         _errorMessage.value = null
@@ -342,15 +372,64 @@ class FleetViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun askGeminiAssistant(prompt: String) {
+    fun sendMessageToAssistant(prompt: String) {
+        val trimmed = prompt.trim()
+        if (trimmed.isBlank()) return
+        val userMsg = com.example.model.AiChatMessage(
+            sender = com.example.model.MessageSender.USER,
+            text = trimmed,
+            timestamp = System.currentTimeMillis()
+        )
+        val currentHistory = _chatMessages.value + userMsg
+        _chatMessages.value = currentHistory
+        _isAiChatLoading.value = true
+
         viewModelScope.launch {
-            _isAiAnalyzing.value = true
-            _aiResponseText.value = null
-            val currentVehicles = uiState.value.filteredVehicles
-            val response = geminiService.analyzeFleetDiagnostics(currentVehicles, prompt)
-            _aiResponseText.value = response
-            _isAiAnalyzing.value = false
+            try {
+                val currentVehicles = repository.vehiclesFlow.first()
+                val (aiText, referencedCards) = geminiService.chatWithFleetAssistant(
+                    history = currentHistory,
+                    vehicles = currentVehicles,
+                    userPrompt = trimmed
+                )
+                val assistantMsg = com.example.model.AiChatMessage(
+                    sender = com.example.model.MessageSender.ASSISTANT,
+                    text = aiText,
+                    timestamp = System.currentTimeMillis(),
+                    referencedVehicles = referencedCards,
+                    status = com.example.model.MessageStatus.SENT
+                )
+                _chatMessages.value = _chatMessages.value + assistantMsg
+            } catch (e: Exception) {
+                val errorMsg = com.example.model.AiChatMessage(
+                    sender = com.example.model.MessageSender.ASSISTANT,
+                    text = "⚠️ Une erreur est survenue lors de la communication avec Thara AI : ${e.localizedMessage ?: "Vérifiez votre connexion internet."}",
+                    status = com.example.model.MessageStatus.ERROR
+                )
+                _chatMessages.value = _chatMessages.value + errorMsg
+            } finally {
+                _isAiChatLoading.value = false
+            }
         }
+    }
+
+    fun clearChatHistory() {
+        _chatMessages.value = listOf(
+            com.example.model.AiChatMessage(
+                sender = com.example.model.MessageSender.ASSISTANT,
+                text = "💬 Historique de conversation réinitialisé. Comment puis-je vous aider avec votre flotte aujourd'hui ?",
+                suggestedActions = listOf(
+                    "Quels camions sont au ralenti ?",
+                    "Y a-t-il des véhicules en réserve de carburant ?",
+                    "Qui est en excès de vitesse ?",
+                    "Synthèse globale de la flotte"
+                )
+            )
+        )
+    }
+
+    fun askGeminiAssistant(prompt: String) {
+        sendMessageToAssistant(prompt)
     }
 
     fun clearAiResponse() {

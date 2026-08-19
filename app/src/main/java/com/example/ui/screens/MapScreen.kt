@@ -26,6 +26,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,6 +51,7 @@ import com.example.ui.components.SatelliteHybridWebViewMap
 import com.example.ui.components.VehicleDetailBottomSheet
 import com.example.ui.components.VehicleRealTimeStatusOverlay
 import com.example.ui.components.ZoneConfigurationSheet
+import com.example.ui.screens.LocationMapScreen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.example.ui.theme.Cyan400
 import com.example.ui.theme.Emerald400
@@ -82,12 +84,49 @@ fun MapScreen(
     var showPhoneTrackingSheet by remember { mutableStateOf(false) }
     var useOsmdroidMap by remember { mutableStateOf(false) }
     var showOfflineCacheSheet by remember { mutableStateOf(false) }
+    var isLiveLocationPoiMode by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("map_screen")
-    ) {
+    if (isLiveLocationPoiMode) {
+        Box(modifier = modifier.fillMaxSize()) {
+            LocationMapScreen(modifier = Modifier.fillMaxSize())
+
+            // Floating Switcher Back to Fleet Telematics
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF0F172A),
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { isLiveLocationPoiMode = false }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = Color(0xFF10B981),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "🛰️ Retour Flotte",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    } else {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .testTag("map_screen")
+        ) {
         if (useOsmdroidMap) {
             // Osmdroid Native Offline Map View with persistent tile caching
             OpenStreetMapView(
@@ -245,6 +284,23 @@ fun MapScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Location & POI Module Button
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF10B981))
+                            .clickable { isLiveLocationPoiMode = true }
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                            .testTag("open_live_location_poi_mode_button")
+                    ) {
+                        Text(
+                            text = "📍 Suivi & POIs",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
                     // Offline Tile Cache Manager Button
                     Box(
                         modifier = Modifier
@@ -415,6 +471,7 @@ fun MapScreen(
             )
         }
     }
+}
 }
 
 @Composable

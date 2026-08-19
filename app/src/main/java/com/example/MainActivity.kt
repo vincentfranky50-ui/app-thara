@@ -39,9 +39,12 @@ import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.TripHistoryScreen
 import android.Manifest
 import android.os.Build
+import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
+import com.example.service.TharaFirebaseMessagingService
 import com.example.ui.theme.TharaTheme
 import com.example.ui.viewmodel.FleetViewModel
+import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : ComponentActivity() {
     private val fleetViewModel: FleetViewModel by viewModels()
@@ -49,7 +52,9 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        // Handle permission result if needed in future, otherwise just proceed
+        if (isGranted) {
+            Log.d("MainActivity", "Permission de notifications POST_NOTIFICATIONS accordée")
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,6 +66,14 @@ class MainActivity : ComponentActivity() {
             requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        // Configuration Firebase Cloud Messaging
+        initializeFirebaseMessaging()
+
+        // Gestion du clic de notification entrante
+        intent?.getStringExtra(TharaFirebaseMessagingService.EXTRA_VEHICLE_ID)?.let { vehicleId ->
+            fleetViewModel.selectVehicle(vehicleId)
+        }
+
         setContent {
             val uiState by fleetViewModel.uiState.collectAsStateWithLifecycle()
             var isAuthenticated by remember { mutableStateOf(false) }
@@ -69,6 +82,7 @@ class MainActivity : ComponentActivity() {
             var showEngineMaintenance by remember { mutableStateOf(false) }
             var showDriverCoaching by remember { mutableStateOf(false) }
             var showRouteOptimization by remember { mutableStateOf(false) }
+            var showAiAssistant by remember { mutableStateOf(false) }
             var showExportModal by remember { mutableStateOf(false) }
             var showSettings by remember { mutableStateOf(false) }
 
@@ -129,6 +143,24 @@ class MainActivity : ComponentActivity() {
                                 onBack = { showEngineMaintenance = false },
                                 onOpenExportModal = { showExportModal = true }
                             )
+                        } else if (showAiAssistant) {
+                            com.example.ui.screens.GeminiAssistantScreen(
+                                chatMessages = uiState.chatMessages,
+                                isLoading = uiState.isAiChatLoading,
+                                onSendMessage = { prompt -> fleetViewModel.sendMessageToAssistant(prompt) },
+                                onClearChat = { fleetViewModel.clearChatHistory() },
+                                onNavigateToVehicle = { vehicleId ->
+                                    fleetViewModel.selectVehicle(vehicleId)
+                                    showAiAssistant = false
+                                    currentTab = TharaTab.MAP
+                                },
+                                onOpenEngineMaintenance = {
+                                    showAiAssistant = false
+                                    showEngineMaintenance = true
+                                },
+                                onBack = { showAiAssistant = false },
+                                isDarkTheme = uiState.isDarkTheme
+                            )
                         } else if (showGeofenceConfig) {
                             com.example.ui.screens.GeofenceConfigScreen(
                                 geofences = uiState.geofences,
@@ -147,10 +179,11 @@ class MainActivity : ComponentActivity() {
                             )
                         } else {
                             when (currentTab) {
-                                TharaTab.FLEET -> {
+                                 TharaTab.FLEET -> {
                                     FleetOverviewScreen(
                                         vehicles = uiState.filteredVehicles,
                                         geofences = uiState.geofences,
+                                        alerts = uiState.alerts,
                                         selectedVehicle = uiState.selectedVehicle,
                                         onSelectVehicle = { v -> fleetViewModel.selectVehicle(v.id) },
                                         onNavigateToMap = {
@@ -162,7 +195,10 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onNavigateToTrips = {
                                             currentTab = TharaTab.TRIPS
-                                        }
+                                        },
+                                        onOpenAiAssistant = { showAiAssistant = true },
+                                        onAcknowledgeAlert = { alertId -> fleetViewModel.acknowledgeAlert(alertId) },
+                                        onClearAllAlerts = { fleetViewModel.clearAllAlerts() }
                                     )
                                 }
                                 TharaTab.TRIPS -> {
@@ -217,7 +253,8 @@ class MainActivity : ComponentActivity() {
                                         onOpenEngineMaintenance = { showEngineMaintenance = true },
                                         onOpenDriverCoaching = { showDriverCoaching = true },
                                         onOpenRouteOptimization = { showRouteOptimization = true },
-                                        onOpenExportModal = { showExportModal = true }
+                                        onOpenExportModal = { showExportModal = true },
+                                        onOpenAiChat = { showAiAssistant = true }
                                     )
                                 }
                                 TharaTab.PROFILE -> {
@@ -316,4 +353,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+    private fun initializeFirebaseMessaging() {
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val token = task.result
+                    Log.d("MainActivity", "Token FCM initialisé: $token")
+                    val prefs = getSharedPreferences("thara_fleet_prefs", MODE_PRIVATE)
+                    prefs.edit().putString("fcm_device_token", token).apply()
+                } else {
+                    Log.w("MainActivity", "Échec de récupération du token FCM", task.exception)
+                }
+            }
+
+            // Inscription automatique aux topics d'alertes de flotte
+            FirebaseMessaging.getInstance().subscribeToTopic("fleet_alerts")
+            FirebaseMessaging.getInstance().subscribeToTopic("geofence_alerts")
+            FirebaseMessaging.getInstance().subscribeToTopic("fuel_alerts")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Erreur lors de l'initialisation de Firebase Messaging", e)
+        }
+    }
 }

@@ -9,6 +9,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,29 +19,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-data class AlarmMessage(
-    val deviceName: String,
-    val time: String,
-    val messageType: String
-)
+import com.example.model.Alert
+import com.example.model.AlertSeverity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageCenterBottomSheet(
+    alerts: List<Alert> = emptyList(),
+    onAcknowledgeAlert: ((String) -> Unit)? = null,
+    onClearAllAlerts: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) } // 0: Message d'alarme, 1: Notification
 
-    val alarms = listOf(
-        AlarmMessage("corolla armel", "2026-08-13 14:25:26", "Shock"),
-        AlarmMessage("corolla armel", "2026-08-13 14:21:17", "Shock"),
-        AlarmMessage("corolla armel", "2026-08-13 14:18:36", "Acc"),
-        AlarmMessage("corolla armel", "2026-08-13 14:18:15", "Shock"),
-        AlarmMessage("corolla armel", "2026-08-13 13:34:56", "Shock")
-    )
+    val unacknowledgedAlerts = remember(alerts) {
+        alerts.filter { !it.acknowledged }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -48,7 +50,7 @@ fun MessageCenterBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.9f)
+                .fillMaxHeight(0.85f)
                 .padding(horizontal = 16.dp)
         ) {
             // Header Bar
@@ -60,7 +62,11 @@ fun MessageCenterBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = Color(0xFF1E293B))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Retour",
+                        tint = Color(0xFF1E293B)
+                    )
                 }
                 Text(
                     text = "Centre de messages",
@@ -68,15 +74,25 @@ fun MessageCenterBottomSheet(
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1E293B)
                 )
-                // Profile Avatar placeholder
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFCBD5E1)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = "VA", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+                if (alerts.isNotEmpty()) {
+                    IconButton(onClick = { onClearAllAlerts?.invoke() }) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteSweep,
+                            contentDescription = "Tout effacer",
+                            tint = Color(0xFFEF4444)
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE2E8F0)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "0", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+                    }
                 }
             }
 
@@ -87,7 +103,10 @@ fun MessageCenterBottomSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                val tabs = listOf("Message d'alarme", "Notification")
+                val tabs = listOf(
+                    "Message d'alarme (${unacknowledgedAlerts.size})",
+                    "Notifications (0)"
+                )
                 tabs.forEachIndexed { index, title ->
                     val isSelected = selectedTab == index
                     Column(
@@ -105,7 +124,7 @@ fun MessageCenterBottomSheet(
                         Spacer(modifier = Modifier.height(6.dp))
                         Box(
                             modifier = Modifier
-                                .width(120.dp)
+                                .width(130.dp)
                                 .height(3.dp)
                                 .background(if (isSelected) Color(0xFF10B981) else Color.Transparent)
                         )
@@ -113,82 +132,142 @@ fun MessageCenterBottomSheet(
                 }
             }
 
-            Divider(color = Color(0xFFE2E8F0), thickness = 1.dp)
-            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 1.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Content List
             if (selectedTab == 0) {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(alarms) { alarm ->
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            modifier = Modifier.fillMaxWidth()
+                if (unacknowledgedAlerts.isEmpty()) {
+                    // Empty state : 0 Notification / Aucune alarme
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(24.dp)
                         ) {
-                            Column(
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    .size(72.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFE0F2FE)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = "Nom de l'appareil", fontSize = 14.sp, color = Color.Gray)
-                                    Text(text = alarm.deviceName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1E293B))
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = "Heure", fontSize = 14.sp, color = Color.Gray)
-                                    Text(text = alarm.time, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF1E293B))
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = "Type de message", fontSize = 14.sp, color = Color.Gray)
-                                    Text(text = alarm.messageType, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.NotificationsOff,
+                                    contentDescription = null,
+                                    tint = Color(0xFF0284C7),
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
 
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Divider(color = Color(0xFFF1F5F9))
-                                Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Aucune alarme active",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1E293B)
+                            )
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                            Text(
+                                text = "Vos notifications sont à 0. Tous les éléments de test ont été supprimés et la flotte opère normalement.",
+                                fontSize = 13.sp,
+                                color = Color(0xFF64748B),
+                                textAlign = TextAlign.Center,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(unacknowledgedAlerts, key = { it.id }) { alert ->
+                            val timeStr = remember(alert.timestamp) {
+                                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(alert.timestamp))
+                            }
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(text = "Opérer", fontSize = 14.sp, color = Color.Gray)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = "Nom du véhicule", fontSize = 14.sp, color = Color.Gray)
+                                        Text(
+                                            text = alert.vehicleName,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF1E293B)
+                                        )
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = "Heure", fontSize = 14.sp, color = Color.Gray)
+                                        Text(
+                                            text = timeStr,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF1E293B)
+                                        )
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = "Type d'alerte", fontSize = 14.sp, color = Color.Gray)
+                                        Text(
+                                            text = alert.type.name,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (alert.severity == AlertSeverity.CRITICAL) Color(0xFFDC2626) else Color(0xFFD97706)
+                                        )
+                                    }
 
-                                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        OutlinedButton(
-                                            onClick = { /* View action */ },
-                                            shape = RoundedCornerShape(20.dp),
-                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981)),
-                                            modifier = Modifier
-                                                .height(36.dp)
-                                                .width(80.dp)
-                                        ) {
-                                            Text(text = "Voir", color = Color(0xFF10B981), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                        }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "Opérer", fontSize = 14.sp, color = Color.Gray)
 
                                         Button(
-                                            onClick = { /* Stop action */ },
+                                            onClick = { onAcknowledgeAlert?.invoke(alert.id) },
                                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                                             shape = RoundedCornerShape(20.dp),
-                                            modifier = Modifier
-                                                .height(36.dp)
-                                                .width(90.dp)
+                                            modifier = Modifier.height(36.dp)
                                         ) {
-                                            Text(text = "Arrêter", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "Marquer lu",
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
                                         }
                                     }
                                 }
@@ -198,10 +277,28 @@ fun MessageCenterBottomSheet(
                 }
             } else {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "Aucune nouvelle notification", color = Color.Gray, fontSize = 15.sp)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.NotificationsOff,
+                            contentDescription = null,
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Text(
+                            text = "0 nouvelle notification",
+                            color = Color(0xFF64748B),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }

@@ -36,6 +36,12 @@ interface FleetDao {
     @Query("UPDATE alerts SET acknowledged = 1 WHERE id = :alertId")
     suspend fun acknowledgeAlert(alertId: String)
 
+    @Query("UPDATE alerts SET acknowledged = 1")
+    suspend fun acknowledgeAllAlerts()
+
+    @Query("DELETE FROM alerts")
+    suspend fun deleteAllAlerts()
+
     @Query("SELECT * FROM geofences ORDER BY name ASC")
     fun getAllGeofences(): Flow<List<GeofenceEntity>>
 
